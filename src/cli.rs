@@ -1,35 +1,76 @@
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
-pub enum Opts {
+pub enum Command {
     /// Run the webalert daemon
     #[structopt(alias = "s")]
     Server(ServerOpts),
 
     /// Perform database operations
-    #[structopt(alias = "db")]
-    Database,
+    #[structopt(name = "database", alias = "db")]
+    DbCommand(DbSubCommand),
 }
 
 #[derive(StructOpt, Debug)]
+pub enum MigrateCommand {
+    /// Migrates the database to the specified version
+    Up(MigrateOpts),
+    /// Performs a rollback to the specified version
+    Down(MigrateOpts),
+}
+
+#[derive(StructOpt, Debug)]
+pub enum DbSubCommand {
+    /// Perform migrations on the database
+    Migrate(MigrateCommand),
+}
+
+#[derive(StructOpt, Debug)]
+pub struct MigrateOpts {
+    /// The version to migrate to
+    pub version: Option<String>,
+}
+
+#[derive(StructOpt, Debug)]
+pub struct Opts {
+    #[structopt(subcommand)]
+    pub command: Command,
+
+    /// PostgreSQL host
+    #[structopt(
+        long,
+        env = "POSTGRES_HOST",
+        value_name = "HOSTNAME",
+        default_value = "localhost"
+    )]
+    pub postgres_host: String,
+
+    /// PostgreSQL user
+    #[structopt(
+        long,
+        env = "POSTGRES_USER",
+        value_name = "USER",
+        default_value = "webalert"
+    )]
+    pub postgres_user: String,
+
+    /// PostgreSQL user password
+    #[structopt(long, env = "POSTGRES_PASSWORD", value_name = "PASSWORD")]
+    pub postgres_password: String,
+
+    /// PostgreSQL database name
+    #[structopt(
+        long,
+        env = "POSTGRES_DB",
+        value_name = "DATABASE",
+        default_value = "webalert_development"
+    )]
+    pub postgres_db: String,
+}
+
+#[derive(StructOpt, Debug, Clone)]
 pub struct ServerOpts {
     /// The number of webdrivers to run in parallel
     #[structopt(short = "n", default_value = "3")]
     pub num_webdrivers: u64,
-
-    /// PostgreSQL host
-    #[structopt(long, default_value = "localhost", env = "postgres_host")]
-    pub postgres_host: String,
-
-    /// PostgreSQL user
-    #[structopt(long, default_value = "webalert", env = "postgres_user")]
-    pub postgres_user: String,
-
-    /// PostgreSQL user password
-    #[structopt(long, long, env = "POSTGRES_PASSWORD")]
-    pub postgres_password: String,
-
-    /// PostgreSQL database name
-    #[structopt(long, default_value = "webalert_development", env = "POSTGRES_DB")]
-    pub postgres_db: String,
 }

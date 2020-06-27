@@ -1,9 +1,20 @@
+use crate::cli;
 use log::debug;
-use tokio_postgres::{Client, Config, Error as PostgresError};
+use tokio_postgres::{self as postgres, Client, Config, Error as PostgresError};
 
-/// Initializes the database by creating a table for migrations
-pub async fn init(conn: &Client) -> Result<(), PostgresError> {
-    prepare_migration(conn).await?;
+/// Connects to the database specified in the CLI `opts` and ten returns the Postgres client
+/// instance
+pub async fn init(opts: &cli::Opts) -> Result<Client, Box<dyn std::error::Error>> {
+    let conf = postgres_config_from_server_opts(&opts)?;
+    let conn = connect(conf).await?;
+
+    Ok(conn)
+}
+
+/// Sets up the schema migration using the given postgres `conn`
+pub async fn init_migration(conn: &mut Client) -> Result<(), PostgresError> {
+    // Create migration table if it doesn't exist
+    prepare_migration(&conn).await?;
 
     debug!(
         "Current migration version: {}",
@@ -35,12 +46,18 @@ pub async fn get_migration_version(db: &Client) -> Result<String, PostgresError>
         )
         .await?;
 
-    Ok(row.get("filename"))
+    Ok(row.get(0))
+}
+
+pub async fn migrate_up_to(db: &mut Client, version: Option<&str>) -> Result<(), PostgresError> {
+    debug!("Migrating database to version `{:?}'", version);
+
+    unimplemented!()
 }
 
 /// Creates a new postgres client config from CLI options
 pub fn postgres_config_from_server_opts(
-    opts: crate::cli::ServerOpts,
+    opts: &cli::Opts,
 ) -> Result<Config, Box<dyn std::error::Error>> {
     let mut config = Config::new();
 
@@ -60,7 +77,7 @@ pub async fn connect(config: Config) -> Result<Client, PostgresError> {
         config.get_dbname().unwrap_or("undefined")
     );
 
-    let (client, conn) = config.connect(tokio_postgres::tls::NoTls).await?;
+    let (client, conn) = config.connect(postgres::tls::NoTls).await?;
 
     tokio::spawn(async move {
         debug!("Connected to Postgres");
