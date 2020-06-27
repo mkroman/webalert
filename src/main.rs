@@ -3,13 +3,13 @@ use std::time::Duration;
 mod cli;
 mod database;
 
-use log::debug;
+use log::{debug, error};
 use selenium_rs::webdriver::{Browser, WebDriver};
 use structopt::StructOpt;
 use tokio::runtime::Runtime;
 
 /// Creates a new web driver with a started session
-fn create_driver() -> Result<WebDriver, Box<dyn std::error::Error>> {
+fn _create_driver() -> Result<WebDriver, Box<dyn std::error::Error>> {
     let mut driver = WebDriver::new(Browser::Chrome);
 
     driver.start_session()?;
@@ -17,9 +17,13 @@ fn create_driver() -> Result<WebDriver, Box<dyn std::error::Error>> {
     Ok(driver)
 }
 
-async fn async_main(opts: cli::Opts) -> Result<(), Box<dyn std::error::Error>> {
-    let conf = database::postgres_config_from_opts(opts)?;
+async fn async_main(opts: cli::ServerOpts) -> Result<(), Box<dyn std::error::Error>> {
+    // Connect to the PostgreSQL database
+    let conf = database::postgres_config_from_server_opts(opts)?;
     let conn = database::connect(conf).await?;
+
+    // Create migration table if it doesn't exist
+    database::init(&conn).await?;
 
     Ok(())
 }
@@ -29,27 +33,15 @@ fn main() {
 
     // Set up the async runtime
     let mut rt = Runtime::new().unwrap();
-
+    // Parse the command-line arguments
     let opts = cli::Opts::from_args();
 
-    debug!("Opts: {:?}", opts);
-
-    /*
-    for _ in 0..opts.num_webdrivers {
-        std::thread::spawn(|| {
-            let mut driver = create_driver().expect("could not create driver");
-
-            debug!("Navigating to rust website");
-            driver.navigate("https://www.rust-lang.org").unwrap();
-
-            debug!("title: {:?}", driver.get_title());
-
-            assert_eq!(
-                driver.get_current_url().unwrap(),
-                String::from("https://www.rust-lang.org/")
-            );
-        });
-    }*/
-
-    rt.block_on(async_main(opts)).unwrap();
+    match opts {
+        cli::Opts::Server(opts) => {
+            if let Err(err) = rt.block_on(async_main(opts)) {
+                error!("runtime error: {}", err);
+            }
+        }
+        _ => {}
+    }
 }

@@ -1,7 +1,18 @@
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
-pub struct Opts {
+pub enum Opts {
+    /// Run the webalert daemon
+    #[structopt(alias = "s")]
+    Server(ServerOpts),
+
+    /// Perform database operations
+    #[structopt(alias = "db")]
+    Database,
+}
+
+#[derive(StructOpt, Debug)]
+pub struct ServerOpts {
     /// The number of webdrivers to run in parallel
     #[structopt(short = "n", default_value = "3")]
     pub num_webdrivers: u64,
