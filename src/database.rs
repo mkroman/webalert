@@ -11,14 +11,17 @@ pub async fn init(opts: &cli::Opts) -> Result<Client, Box<dyn std::error::Error>
     Ok(conn)
 }
 
-/// Sets up the schema migration using the given postgres `conn`
+/// Sets up the schema migration using the given postgres `conn` and returns the current migration
+/// version, if any
 pub async fn init_migration(conn: &mut Client) -> Result<(), PostgresError> {
     // Create migration table if it doesn't exist
     prepare_migration(&conn).await?;
 
     debug!(
         "Current migration version: {}",
-        get_migration_version(&conn).await?
+        get_migration_version(&conn)
+            .await?
+            .unwrap_or_else(|| "none".to_owned())
     );
 
     Ok(())
@@ -30,7 +33,7 @@ pub async fn init_migration(conn: &mut Client) -> Result<(), PostgresError> {
 pub async fn prepare_migration(db: &Client) -> Result<u64, PostgresError> {
     db.execute(
         "CREATE TABLE IF NOT EXISTS schema_migrations (
-            filename TEXT NOT NULL
+            filename VARCHAR(255) NOT NULL PRIMARY KEY
         )",
         &[],
     )
@@ -38,21 +41,18 @@ pub async fn prepare_migration(db: &Client) -> Result<u64, PostgresError> {
 }
 
 /// Returns the latest migration filename applied to the database
-pub async fn get_migration_version(db: &Client) -> Result<String, PostgresError> {
+pub async fn get_migration_version(db: &Client) -> Result<Option<String>, PostgresError> {
     let row = db
         .query_one(
             "SELECT filename FROM schema_migrations ORDER BY filename DESC LIMIT 1",
             &[],
         )
-        .await?;
+        .await;
 
-    Ok(row.get(0))
-}
-
-pub async fn migrate_up_to(db: &mut Client, version: Option<&str>) -> Result<(), PostgresError> {
-    debug!("Migrating database to version `{:?}'", version);
-
-    unimplemented!()
+    match row {
+        Ok(row) => Ok(row.get(0)),
+        Err(_) => Ok(None),
+    }
 }
 
 /// Creates a new postgres client config from CLI options

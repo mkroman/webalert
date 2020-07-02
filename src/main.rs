@@ -1,6 +1,5 @@
-mod cli;
-mod database;
-mod migration;
+use webalert::migration::MigrationRunner;
+use webalert::{cli, database};
 
 use log::{debug, error};
 use structopt::StructOpt;
@@ -16,12 +15,15 @@ async fn async_main(opts: cli::Opts) -> Result<(), Box<dyn std::error::Error>> {
         }
         cli::Command::DbCommand(cmd) => match &cmd {
             cli::DbSubCommand::Migrate(dir) => {
+                // Create the necessary database schema for migrations if it doesn't exist
                 database::init_migration(&mut conn).await?;
 
+                let current_version = database::get_migration_version(&conn).await?;
+                let mut runner = MigrationRunner::new(&mut conn, current_version);
+
                 match dir {
-                    cli::MigrateCommand::Up(_) => {
-                        debug!("Migration files: {:?}", migration::get_migrations_sorted()?);
-                        debug!("db_conn: {:?}", conn);
+                    cli::MigrateCommand::Up(ver) => {
+                        runner.migrate_up_to_version(ver.version.as_deref()).await?;
                     }
                     cli::MigrateCommand::Down(_) => {}
                 }
@@ -46,6 +48,5 @@ fn main() {
                 error!("runtime error: {}", err);
             }
         }
-        _ => unimplemented!(),
     }
 }
