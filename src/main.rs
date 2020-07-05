@@ -1,3 +1,4 @@
+use webalert::http_server;
 use webalert::migration::MigrationRunner;
 use webalert::{cli, database};
 
@@ -12,6 +13,10 @@ async fn async_main(opts: cli::Opts) -> Result<(), Box<dyn std::error::Error>> {
     match &opts.command {
         cli::Command::Server(_) => {
             debug!("Starting server");
+
+            let http_server = http_server::create_http_server();
+
+            tokio::join!(http_server);
         }
         cli::Command::DbCommand(cmd) => match &cmd {
             cli::DbSubCommand::Migrate(dir) => {
