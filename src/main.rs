@@ -14,7 +14,7 @@ async fn async_main(opts: cli::Opts) -> Result<(), Box<dyn std::error::Error>> {
         cli::Command::Server(ref server_opts) => {
             debug!("Starting server");
 
-            let http_server = http::start_http_server(server_opts);
+            let http_server = http::start_http_server(server_opts, conn);
 
             tokio::join!(http_server);
         }

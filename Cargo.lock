@@ -2549,6 +2549,8 @@ dependencies = [
  "lazy_static",
  "log 0.4.8",
  "selenium-rs",
+ "serde",
+ "serde_json",
  "structopt",
  "tokio 0.2.21",
  "tokio-postgres",

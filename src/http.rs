@@ -1,19 +1,15 @@
 use std::net::SocketAddr;
+use std::sync::Arc;
 
 use crate::cli;
 
 use log::{debug, error};
-use warp::{http::header::HeaderValue, http::Response, Filter, Reply};
+use tokio_postgres::Client;
+use warp::Filter;
 
 mod api_v1;
 
-fn not_found() -> impl Reply {
-    Response::builder()
-        .status(404)
-        .body("The requested resource was not found")
-}
-
-pub async fn start_http_server(opts: &cli::ServerOpts) {
+pub async fn start_http_server(opts: &cli::ServerOpts, db: Client) {
     debug!("Starting HTTP server");
 
     let addr: SocketAddr = (opts.host, opts.port).into();
@@ -22,19 +18,13 @@ pub async fn start_http_server(opts: &cli::ServerOpts) {
     // GET /api/…
     let api = warp::path("api");
 
-    // GET /api/v1/…
-    let api_v1 = api.and(warp::path("v1").and(warp::header::value("x-token")).map(
-        |value: HeaderValue| {
-            println!("Received token: {:?}", value);
+    // GET /api/v1
+    let api_v1 = api.and(warp::path("v1"));
 
-            "henlo"
-        },
-    ));
+    // GET /api/v1/{alerts,}
+    let alerts = api_v1.and(api_v1::alerts(Arc::new(db)));
 
-    // 404 error handler
-    let not_found_error = warp::any().map(not_found);
-
-    let routes = warp::any().and(api_v1.or(not_found_error));
+    let routes = warp::any().and(alerts).recover(api_v1::handle_rejection);
 
     warp::serve(routes).run(addr).await;
 
