@@ -70,10 +70,25 @@ pub fn postgres_config_from_server_opts(
     Ok(config)
 }
 
+/// Formats a postgres `Host` as a readable string
+fn format_postgres_host(host: &postgres::config::Host) -> String {
+    match host {
+        postgres::config::Host::Tcp(ref s) => format!("tcp://{}", s),
+        postgres::config::Host::Unix(ref path) => {
+            format!("unix://{}", path.as_path().to_string_lossy())
+        }
+    }
+}
+
 pub async fn connect(config: Config) -> Result<Client, PostgresError> {
     debug!(
-        "Connecting to Postgres at {:?}, using the database `{}'",
-        config.get_hosts(),
+        "Connecting to Postgres at {}, using the database `{}'",
+        config
+            .get_hosts()
+            .iter()
+            .map(format_postgres_host)
+            .collect::<Vec<String>>()
+            .join(", "),
         config.get_dbname().unwrap_or("undefined")
     );
 
