@@ -40,7 +40,7 @@ pub async fn prepare_migration(db: &Client) -> Result<u64, PostgresError> {
     .await
 }
 
-/// Returns the latest migration filename applied to the database
+/// Returns the latest migration filename applied to the database, as a string
 pub async fn get_migration_version(db: &Client) -> Result<Option<String>, PostgresError> {
     let row = db
         .query_one(

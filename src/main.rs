@@ -1,4 +1,4 @@
-use webalert::http_server;
+use webalert::http;
 use webalert::migration::MigrationRunner;
 use webalert::{cli, database};
 
@@ -11,10 +11,10 @@ async fn async_main(opts: cli::Opts) -> Result<(), Box<dyn std::error::Error>> {
     let mut conn = database::init(&opts).await?;
 
     match &opts.command {
-        cli::Command::Server(_) => {
+        cli::Command::Server(ref server_opts) => {
             debug!("Starting server");
 
-            let http_server = http_server::create_http_server();
+            let http_server = http::start_http_server(server_opts);
 
             tokio::join!(http_server);
         }
