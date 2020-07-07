@@ -1,8 +1,9 @@
 use std::convert::Infallible;
 
+use chrono::{DateTime, Utc};
 use serde::Serialize;
 use warp::http::StatusCode;
-use warp::{reject::Reject, Rejection, Reply};
+use warp::{reject, reject::Reject, Rejection, Reply};
 
 pub type Token = String;
 
@@ -17,15 +18,60 @@ pub struct ErrorMessage {
     message: String,
 }
 
+#[derive(Debug, Serialize)]
+pub struct Alert {
+    id: i32,
+    url: String,
+    selector: String,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+struct AlertListResponse {
+    status: String,
+    alerts: Vec<Alert>,
+    num_alerts: u64,
+}
+
 mod handlers {
-    use super::{Token, TokenRejection};
+    use super::*;
     use std::sync::Arc;
     use tokio_postgres::Client;
-    use warp::{reject, Rejection, Reply};
 
+    /// Returns a JSON-serialized `AlertListResponse` with alerts beloning to the given `token`
     pub async fn list_alerts(db: Arc<Client>, token: Token) -> Result<impl Reply, Rejection> {
+        validate_token(db.clone(), &token).await?;
+
+        let alerts: Vec<Alert> = db
+            .query(
+                "SELECT * FROM alerts WHERE creator_token = $1::TEXT",
+                &[&token],
+            )
+            .await
+            .map_err(|_| reject::reject())?
+            .iter()
+            .map(|row| Alert {
+                id: row.get(0),
+                url: row.get(1),
+                selector: row.get(2),
+                created_at: row.get(3),
+                updated_at: row.get(4),
+            })
+            .collect();
+
+        let json = warp::reply::json(&AlertListResponse {
+            status: "ok".to_owned(),
+            num_alerts: alerts.len() as u64,
+            alerts,
+        });
+
+        Ok(warp::reply::with_status(json, StatusCode::OK))
+    }
+
+    async fn validate_token(db: Arc<Client>, token: &Token) -> Result<Token, Rejection> {
         match db
-            .query_one("SELECT token FROM tokens WHERE token = $1::TEXT", &[&token])
+            .query_one("SELECT token FROM tokens WHERE token = $1::TEXT", &[token])
             .await
         {
             Ok(row) => Ok(row.get::<_, Token>(0)),
