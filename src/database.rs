@@ -1,20 +1,23 @@
 use crate::cli;
 
 use log::debug;
-use tokio_postgres::{self as postgres, Client, Config, Error as PostgresError};
+use sqlx::prelude::*;
+use sqlx::{Error, PgPool};
+
+/// The database pool type. We're using Postgres for now.
+pub type DbPool = PgPool;
 
 /// Connects to the database specified in the CLI `opts` and ten returns the Postgres client
 /// instance
-pub async fn init(opts: &cli::Opts) -> Result<Client, Box<dyn std::error::Error>> {
-    let conf = postgres_config_from_server_opts(&opts)?;
-    let conn = connect(conf).await?;
+pub async fn init(opts: &cli::Opts) -> Result<PgPool, Box<dyn std::error::Error>> {
+    let conn = connect(&opts.postgres_url).await?;
 
     Ok(conn)
 }
 
 /// Sets up the schema migration using the given postgres `conn` and returns the current migration
 /// version, if any
-pub async fn init_migration(conn: &mut Client) -> Result<(), PostgresError> {
+pub async fn init_migration(conn: &mut PgPool) -> Result<(), Error> {
     // Create migration table if it doesn't exist
     prepare_migration(&conn).await?;
 
@@ -31,79 +34,31 @@ pub async fn init_migration(conn: &mut Client) -> Result<(), PostgresError> {
 /// Prepares the database by creating migration tables if they don't already exist
 ///
 /// Returns the number of rows modified
-pub async fn prepare_migration(db: &Client) -> Result<u64, PostgresError> {
-    db.execute(
+pub async fn prepare_migration(db: &PgPool) -> Result<u64, Error> {
+    let res = sqlx::query(
         "CREATE TABLE IF NOT EXISTS schema_migrations (
             filename VARCHAR(255) NOT NULL PRIMARY KEY
         )",
-        &[],
     )
-    .await
+    .execute(db)
+    .await?;
+
+    Ok(res)
 }
 
 /// Returns the latest migration filename applied to the database, as a string
-pub async fn get_migration_version(db: &Client) -> Result<Option<String>, PostgresError> {
-    let row = db
-        .query_one(
-            "SELECT filename FROM schema_migrations ORDER BY filename DESC LIMIT 1",
-            &[],
-        )
-        .await;
+pub async fn get_migration_version(db: &PgPool) -> Result<Option<String>, Error> {
+    let row: Option<String> =
+        sqlx::query_as("SELECT filename FROM schema_migrations ORDER BY filename DESC LIMIT 1")
+            .fetch_optional(db)
+            .await?
+            .map(|row: (String,)| row.0);
 
-    match row {
-        Ok(row) => Ok(row.get(0)),
-        Err(_) => Ok(None),
-    }
+    Ok(row)
 }
 
-/// Creates a new postgres client config from CLI options
-pub fn postgres_config_from_server_opts(
-    opts: &cli::Opts,
-) -> Result<Config, Box<dyn std::error::Error>> {
-    let mut config = Config::new();
+pub async fn connect(url: &str) -> Result<PgPool, Error> {
+    let pool = PgPool::builder().max_size(5).build(url).await?;
 
-    config
-        .user(&opts.postgres_user)
-        .password(&opts.postgres_password)
-        .dbname(&opts.postgres_db)
-        .host(&opts.postgres_host);
-
-    Ok(config)
-}
-
-/// Formats a postgres `Host` as a readable string
-fn format_postgres_host(host: &postgres::config::Host) -> String {
-    match host {
-        postgres::config::Host::Tcp(ref s) => format!("tcp://{}", s),
-        postgres::config::Host::Unix(ref path) => {
-            format!("unix://{}", path.as_path().to_string_lossy())
-        }
-    }
-}
-
-pub async fn connect(config: Config) -> Result<Client, PostgresError> {
-    debug!(
-        "Connecting to Postgres at {}, using the database `{}'",
-        config
-            .get_hosts()
-            .iter()
-            .map(format_postgres_host)
-            .collect::<Vec<String>>()
-            .join(", "),
-        config.get_dbname().unwrap_or("undefined")
-    );
-
-    let (client, conn) = config.connect(postgres::tls::NoTls).await?;
-
-    tokio::spawn(async move {
-        debug!("Connected to Postgres");
-
-        if let Err(e) = conn.await {
-            eprintln!("connection error: {}", e);
-        }
-
-        debug!("Connection terminated");
-    });
-
-    Ok(client)
+    Ok(pool)
 }

@@ -18,7 +18,7 @@ pub struct ErrorMessage {
     message: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct Alert {
     id: i32,
     url: String,
@@ -36,29 +36,22 @@ struct AlertListResponse {
 
 mod handlers {
     use super::*;
-    use std::sync::Arc;
-    use tokio_postgres::Client;
+    use crate::database::DbPool;
+    use sqlx::prelude::*;
 
     /// Returns a JSON-serialized `AlertListResponse` with alerts beloning to the given `token`
-    pub async fn list_alerts(db: Arc<Client>, token: Token) -> Result<impl Reply, Rejection> {
+    pub async fn list_alerts(db: DbPool, token: Token) -> Result<impl Reply, Rejection> {
         validate_token(db.clone(), &token).await?;
 
-        let alerts: Vec<Alert> = db
-            .query(
-                "SELECT * FROM alerts WHERE creator_token = $1::TEXT",
-                &[&token],
-            )
+        let alerts = match sqlx::query_as("SELECT * FROM alerts WHERE creator_token = $1::TEXT")
+            .bind(&token)
+            .fetch_all(&db)
             .await
-            .map_err(|_| reject::reject())?
-            .iter()
-            .map(|row| Alert {
-                id: row.get(0),
-                url: row.get(1),
-                selector: row.get(2),
-                created_at: row.get(3),
-                updated_at: row.get(4),
-            })
-            .collect();
+            .ok()
+        {
+            Some(alerts) => alerts,
+            None => vec![],
+        };
 
         let json = warp::reply::json(&AlertListResponse {
             status: "ok".to_owned(),
@@ -69,33 +62,39 @@ mod handlers {
         Ok(warp::reply::with_status(json, StatusCode::OK))
     }
 
-    async fn validate_token(db: Arc<Client>, token: &Token) -> Result<Token, Rejection> {
-        match db
-            .query_one("SELECT token FROM tokens WHERE token = $1::TEXT", &[token])
-            .await
-        {
-            Ok(row) => Ok(row.get::<_, Token>(0)),
-            Err(_) => Err(reject::custom(TokenRejection)),
+    /// Queries the database for the existance of the given `token` and returns it, unless it
+    /// doesn't exist in which case a `Rejection` error is returned
+    async fn validate_token(db: DbPool, token: &Token) -> Result<Token, Rejection> {
+        let result: Option<String> =
+            sqlx::query_as("SELECT token FROM tokens WHERE token = $1::TEXT")
+                .bind(token)
+                .fetch_optional(&db)
+                .await
+                .map_err(|_| reject::custom(TokenRejection))?
+                .map(|row: (String,)| row.0);
+
+        match result {
+            Some(token) => Ok(token),
+            None => Err(reject::custom(TokenRejection)),
         }
     }
 }
 
 mod filters {
     use super::{handlers, Token};
-    use std::sync::Arc;
-    use tokio_postgres::Client;
+    use crate::database::DbPool;
     use warp::Filter;
 
     // GET /alerts/… with an `X-TOKEN` header
     pub fn alerts(
-        db: Arc<Client>,
+        db: DbPool,
     ) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
         alerts_list(db)
     }
 
     // GET /…/alerts
     pub fn alerts_list(
-        db: Arc<Client>,
+        db: DbPool,
     ) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
         warp::path!("alerts")
             .and(warp::get())
@@ -105,8 +104,8 @@ mod filters {
     }
 
     fn with_db(
-        db: Arc<Client>,
-    ) -> impl Filter<Extract = (Arc<Client>,), Error = std::convert::Infallible> + Clone {
+        db: DbPool,
+    ) -> impl Filter<Extract = (DbPool,), Error = std::convert::Infallible> + Clone {
         warp::any().map(move || db.clone())
     }
 }

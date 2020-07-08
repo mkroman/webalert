@@ -8,23 +8,23 @@ use tokio::runtime::Runtime;
 
 async fn async_main(opts: cli::Opts) -> Result<(), Box<dyn std::error::Error>> {
     // Connect to the PostgreSQL database
-    let mut conn = database::init(&opts).await?;
+    let mut pool = database::init(&opts).await?;
 
     match &opts.command {
         cli::Command::Server(ref server_opts) => {
             debug!("Starting server");
 
-            let http_server = http::start_http_server(server_opts, conn);
+            let http_server = http::start_http_server(server_opts, pool);
 
             tokio::join!(http_server);
         }
         cli::Command::DbCommand(cmd) => match &cmd {
             cli::DbSubCommand::Migrate(dir) => {
                 // Create the necessary database schema for migrations if it doesn't exist
-                database::init_migration(&mut conn).await?;
+                database::init_migration(&mut pool).await?;
 
-                let current_version = database::get_migration_version(&conn).await?;
-                let mut runner = MigrationRunner::new(&mut conn, current_version);
+                let current_version = database::get_migration_version(&pool).await?;
+                let mut runner = MigrationRunner::new(&mut pool, current_version);
 
                 match dir {
                     cli::MigrateCommand::Up(ver) => {

@@ -1,15 +1,14 @@
 use std::net::SocketAddr;
-use std::sync::Arc;
 
 use crate::cli;
 
 use log::{debug, error};
-use tokio_postgres::Client;
+use sqlx::PgPool;
 use warp::Filter;
 
 mod api_v1;
 
-pub async fn start_http_server(opts: &cli::ServerOpts, db: Client) {
+pub async fn start_http_server(opts: &cli::ServerOpts, db_pool: PgPool) {
     debug!("Starting HTTP server");
 
     let addr: SocketAddr = (opts.host, opts.port).into();
@@ -22,7 +21,7 @@ pub async fn start_http_server(opts: &cli::ServerOpts, db: Client) {
     let api_v1 = api.and(warp::path("v1"));
 
     // GET /api/v1/{alerts,}
-    let alerts = api_v1.and(api_v1::alerts(Arc::new(db)));
+    let alerts = api_v1.and(api_v1::alerts(db_pool.clone()));
 
     let routes = warp::any().and(alerts).recover(api_v1::handle_rejection);
 

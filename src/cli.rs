@@ -41,33 +41,11 @@ pub struct Opts {
     /// PostgreSQL host
     #[structopt(
         long,
-        env = "POSTGRES_HOST",
+        env = "POSTGRES_URL",
         value_name = "HOSTNAME",
-        default_value = "localhost"
+        default_value = "postgresql://webalert@localhost/webalert_development"
     )]
-    pub postgres_host: String,
-
-    /// PostgreSQL user
-    #[structopt(
-        long,
-        env = "POSTGRES_USER",
-        value_name = "USER",
-        default_value = "webalert"
-    )]
-    pub postgres_user: String,
-
-    /// PostgreSQL user password
-    #[structopt(long, env = "POSTGRES_PASSWORD", value_name = "PASSWORD")]
-    pub postgres_password: String,
-
-    /// PostgreSQL database name
-    #[structopt(
-        long,
-        env = "POSTGRES_DB",
-        value_name = "DATABASE",
-        default_value = "webalert_development"
-    )]
-    pub postgres_db: String,
+    pub postgres_url: String,
 }
 
 #[derive(StructOpt, Debug, Clone)]

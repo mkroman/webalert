@@ -3,11 +3,11 @@ use std::collections::BTreeMap;
 use crate::migrations;
 
 use log::debug;
-use tokio_postgres::Client;
+use sqlx::PgPool;
 
 /// A migration interface that makes it easier to do transactional migrations to specific versions
 pub struct MigrationRunner<'a> {
-    client: &'a mut Client,
+    pool: &'a mut PgPool,
     /// The current migration version
     current_version: Option<String>,
     /// Initialized binary tree that holds all our migrations
@@ -18,11 +18,11 @@ pub struct MigrationRunner<'a> {
 
 impl<'a> MigrationRunner<'a> {
     /// Creates a new `MigrationRunner` using the given postgres `client`
-    pub fn new(client: &mut Client, current_version: Option<String>) -> MigrationRunner {
+    pub fn new(pool: &mut PgPool, current_version: Option<String>) -> MigrationRunner {
         let (migrations_up, migrations_down) = migrations::init();
 
         MigrationRunner {
-            client,
+            pool,
             current_version,
             migrations_up,
             migrations_down,
@@ -58,23 +58,18 @@ impl<'a> MigrationRunner<'a> {
         };
 
         if !migrations.is_empty() {
-            let mut transaction = self.client.transaction().await?;
-
             for (name, &migration) in migrations {
+                let mut tx = self.pool.begin().await?;
                 debug!("Applying migration {}", name);
 
-                let sub_trans = transaction.transaction().await?;
-                sub_trans.execute(migration, &[]).await?;
-                sub_trans
-                    .execute(
-                        "INSERT INTO schema_migrations (filename) VALUES ($1::TEXT)",
-                        &[name],
-                    )
+                sqlx::query(migration).execute(&mut tx).await?;
+                sqlx::query("INSERT INTO schema_migrations (filename) VALUES ($1::TEXT)")
+                    .bind(name)
+                    .execute(&mut tx)
                     .await?;
-                sub_trans.commit().await?;
-            }
 
-            transaction.commit().await?;
+                tx.commit().await?;
+            }
         }
 
         Ok(())
