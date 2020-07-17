@@ -7,15 +7,14 @@ volumes:
     host:
       path: /var/lib/cargo-cache
 
-services:
-  - name: db
-    image: postgres:12.3-alpine
-    environment:
-      POSTGRES_USER: webalert
-      POSTGRES_PASSWORD: webalert
-      POSTGRES_DB: webalert_development
-
 steps:
+- name: postgres
+  image: postgres:12.3-alpine
+  detach: true
+  environment:
+    POSTGRES_DB: webalert_development
+    POSTGRES_USER: webalert
+    POSTGRES_PASSWORD: webalert
 - name: build
   image: rust:1.45
   volumes:
@@ -45,7 +44,7 @@ steps:
   environment:
     RUST_LOG: debug
     CARGO_HOME: /tmp/cargo-cache
-    POSTGRES_URL: postgresql://webalert:webalert@db/webalert_development
+    POSTGRES_URL: postgresql://webalert:webalert@postgres/webalert_development
   commands:
     - cargo run -- db migrate up
 
@@ -58,15 +57,15 @@ volumes:
     host:
       path: /var/lib/cargo-cache
 
-services:
-  - name: db
-    image: postgres:12.3-alpine
-    environment:
-      POSTGRES_USER: webalert
-      POSTGRES_PASSWORD: webalert
-      POSTGRES_DB: webalert_development
-
 steps:
+- name: postgres
+  image: postgres:12.3-alpine
+  detach: true
+  environment:
+    POSTGRES_USER: webalert
+    POSTGRES_PASSWORD: webalert
+    POSTGRES_DB: webalert_development
+
 - name: build
   image: rustlang/rust:nightly
   volumes:
@@ -76,6 +75,7 @@ steps:
     CARGO_HOME: /tmp/cargo-cache
   commands:
     - cargo build
+
 - name: test
   image: rustlang/rust:nightly
   volumes:
@@ -85,6 +85,7 @@ steps:
     CARGO_HOME: /tmp/cargo-cache
   commands:
     - cargo test
+
 - name: test migrate up
   image: rustlang/rust:nightly
   volumes:
@@ -93,11 +94,11 @@ steps:
   environment:
     RUST_LOG: debug
     CARGO_HOME: /tmp/cargo-cache
-    POSTGRES_URL: postgresql://webalert:webalert@db/webalert_development
+    POSTGRES_URL: postgresql://webalert:webalert@postgres/webalert_development
   commands:
     - cargo run -- db migrate up
 ---
 kind: signature
-hmac: eb6e400011fb2015900f3452512afb1ef1684a07b8059dff95435b4dc7e625dc
+hmac: 86796b80092e8489a018e6f9bb0eb8134799e2143ee76dfcfc187778bf22805a
 
 ...
