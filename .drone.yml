@@ -48,6 +48,18 @@ steps:
   commands:
     - cargo run -- db migrate up
 
+- name: test migrate down
+  image: rust:1.45
+  volumes:
+    - name: cargo-cache
+      path: /tmp/cargo-cache
+  environment:
+    RUST_LOG: debug
+    CARGO_HOME: /tmp/cargo-cache
+    POSTGRES_URL: postgresql://webalert:webalert@postgres/webalert_development
+  commands:
+    - cargo run -- db migrate down 0
+
 ---
 kind: pipeline
 name: rust-nightly
@@ -97,8 +109,21 @@ steps:
     POSTGRES_URL: postgresql://webalert:webalert@postgres/webalert_development
   commands:
     - cargo run -- db migrate up
+
+- name: test migrate down
+  image: rustlang/rust:nightly
+  volumes:
+    - name: cargo-cache
+      path: /tmp/cargo-cache
+  environment:
+    RUST_LOG: debug
+    CARGO_HOME: /tmp/cargo-cache
+    POSTGRES_URL: postgresql://webalert:webalert@postgres/webalert_development
+  commands:
+    - cargo run -- db migrate down 0
+
 ---
 kind: signature
-hmac: 86796b80092e8489a018e6f9bb0eb8134799e2143ee76dfcfc187778bf22805a
+hmac: ab0d2e2d5405b564d90b9008ebfb7e3e9860351b3a31776e572d0c7424605dbd
 
 ...
