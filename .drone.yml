@@ -17,7 +17,7 @@ services:
 
 steps:
 - name: build
-  image: rust:1.44.1
+  image: rust:1.45
   volumes:
     - name: cargo-cache
       path: /tmp/cargo-cache
@@ -27,7 +27,7 @@ steps:
     - cargo build
 
 - name: test
-  image: rust:1.44.1
+  image: rust:1.45
   volumes:
     - name: cargo-cache
       path: /tmp/cargo-cache
@@ -38,7 +38,7 @@ steps:
     - git rev-parse HEAD > .tags
 
 - name: test migrate up
-  image: rust:1.44.1
+  image: rust:1.45
   volumes:
     - name: cargo-cache
       path: /tmp/cargo-cache
@@ -86,7 +86,7 @@ steps:
   commands:
     - cargo test
 - name: test migrate up
-  image: rust:1.44.1
+  image: rustlang/rust:nightly
   volumes:
     - name: cargo-cache
       path: /tmp/cargo-cache
@@ -98,6 +98,6 @@ steps:
     - cargo run -- db migrate up
 ---
 kind: signature
-hmac: 6982ebbb6e7e0ae9640bec8a504035eb60f950dd64f0606b05cdb80ec4fb6e65
+hmac: eb6e400011fb2015900f3452512afb1ef1684a07b8059dff95435b4dc7e625dc
 
 ...
