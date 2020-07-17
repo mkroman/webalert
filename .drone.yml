@@ -7,6 +7,14 @@ volumes:
     host:
       path: /var/lib/cargo-cache
 
+services:
+  - name: db
+    image: postgres:12.3-alpine
+    environment:
+      POSTGRES_USER: webalert
+      POSTGRES_PASSWORD: webalert
+      POSTGRES_DB: webalert_development
+
 steps:
 - name: build
   image: rust:1.44.1
@@ -17,6 +25,7 @@ steps:
     CARGO_HOME: /tmp/cargo-cache
   commands:
     - cargo build
+
 - name: test
   image: rust:1.44.1
   volumes:
@@ -28,6 +37,18 @@ steps:
     - cargo test
     - git rev-parse HEAD > .tags
 
+- name: test migrate up
+  image: rust:1.44.1
+  volumes:
+    - name: cargo-cache
+      path: /tmp/cargo-cache
+  environment:
+    RUST_LOG: debug
+    CARGO_HOME: /tmp/cargo-cache
+    POSTGRES_URL: postgresql://webalert:webalert@db/webalert_development
+  commands:
+    - cargo run -- db migrate up
+
 ---
 kind: pipeline
 name: rust-nightly
@@ -36,6 +57,14 @@ volumes:
   - name: cargo-cache
     host:
       path: /var/lib/cargo-cache
+
+services:
+  - name: db
+    image: postgres:12.3-alpine
+    environment:
+      POSTGRES_USER: webalert
+      POSTGRES_PASSWORD: webalert
+      POSTGRES_DB: webalert_development
 
 steps:
 - name: build
@@ -56,8 +85,19 @@ steps:
     CARGO_HOME: /tmp/cargo-cache
   commands:
     - cargo test
+- name: test migrate up
+  image: rust:1.44.1
+  volumes:
+    - name: cargo-cache
+      path: /tmp/cargo-cache
+  environment:
+    RUST_LOG: debug
+    CARGO_HOME: /tmp/cargo-cache
+    POSTGRES_URL: postgresql://webalert:webalert@db/webalert_development
+  commands:
+    - cargo run -- db migrate up
 ---
 kind: signature
-hmac: 03d78576cd4c9d7d88e725ab837cf7d31a49ad23965f83f1013669ca50f9f66d
+hmac: 6982ebbb6e7e0ae9640bec8a504035eb60f950dd64f0606b05cdb80ec4fb6e65
 
 ...
