@@ -16,9 +16,9 @@ pub enum Command {
 #[derive(StructOpt, Debug)]
 pub enum MigrateCommand {
     /// Migrates the database to the specified version
-    Up(MigrateOpts),
+    Up(MigrateUpOpts),
     /// Performs a rollback to the specified version
-    Down(MigrateOpts),
+    Down(MigrateDownOpts),
 }
 
 #[derive(StructOpt, Debug)]
@@ -27,8 +27,17 @@ pub enum DbSubCommand {
     Migrate(MigrateCommand),
 }
 
+/// Migration CLI options in the down direction where `version` is not an optional argument
 #[derive(StructOpt, Debug)]
-pub struct MigrateOpts {
+pub struct MigrateDownOpts {
+    /// The version to migrate to
+    pub version: String,
+}
+
+/// Migration CLI options in the up direction where `version` is either a String or None - if it is
+/// None, the migration will continue until the latest available option
+#[derive(StructOpt, Debug)]
+pub struct MigrateUpOpts {
     /// The version to migrate to
     pub version: Option<String>,
 }

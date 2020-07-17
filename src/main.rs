@@ -30,7 +30,9 @@ async fn async_main(opts: cli::Opts) -> Result<(), Box<dyn std::error::Error>> {
                     cli::MigrateCommand::Up(ver) => {
                         runner.migrate_up_to_version(ver.version.as_deref()).await?;
                     }
-                    cli::MigrateCommand::Down(_) => {}
+                    cli::MigrateCommand::Down(ver) => {
+                        runner.migrate_down_to_version(ver.version.as_ref()).await?;
+                    }
                 }
             }
         },

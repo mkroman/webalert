@@ -74,4 +74,36 @@ impl<'a> MigrationRunner<'a> {
 
         Ok(())
     }
+
+    /// Runs all migrations from the currently active version back until the given `version`
+    pub async fn migrate_down_to_version(
+        &mut self,
+        version: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let migrations: Vec<(&&str, &&str)> = match self.current_version.as_ref() {
+            Some(current_ver) => self
+                .migrations_down
+                .iter()
+                .filter(|(&key, _)| key <= current_ver.as_str() && key > version)
+                .collect(),
+            None => vec![],
+        };
+
+        if !migrations.is_empty() {
+            for (name, &migration) in migrations.iter().rev() {
+                let mut tx = self.pool.begin().await?;
+                debug!("Applying downwards migration {}", name);
+
+                sqlx::query(migration).execute(&mut tx).await?;
+                sqlx::query("DELETE FROM schema_migrations WHERE (filename = $1::TEXT)")
+                    .bind(name)
+                    .execute(&mut tx)
+                    .await?;
+
+                tx.commit().await?;
+            }
+        }
+
+        Ok(())
+    }
 }
