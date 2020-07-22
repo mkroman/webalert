@@ -15,6 +15,7 @@ steps:
     POSTGRES_DB: webalert_development
     POSTGRES_USER: webalert
     POSTGRES_PASSWORD: webalert
+
 - name: build
   image: rust:1.45
   volumes:
@@ -59,6 +60,31 @@ steps:
     POSTGRES_URL: postgresql://webalert:webalert@postgres/webalert_development
   commands:
     - cargo run -- db migrate down 0
+
+- name: run coverage tests
+  image: rust:1.45
+  privileged: true
+  environment:
+    CARGO_HOME: /tmp/cargo-cache
+  commands:
+    - |
+      apt update && \
+        apt install -y cmake binutils-dev libcurl4-openssl-dev libiberty-dev libelf-dev libdw-dev jq
+      cargo install cargo-kcov
+      cargo kcov --print-install-kcov-sh | sh
+      cargo kcov --all -v
+
+- name: upload code coverage
+  image: rust:1.45
+  volumes:
+    - name: cargo-cache
+      path: /tmp/cargo-cache
+  environment:
+    CARGO_HOME: /tmp/cargo-cache
+    CODECOV_TOKEN:
+      from_secret: codecov_token
+  commands:
+    - bash -c "bash <(curl -s https://codecov.io/bash)"
 
 ---
 kind: pipeline
@@ -124,6 +150,6 @@ steps:
 
 ---
 kind: signature
-hmac: ab0d2e2d5405b564d90b9008ebfb7e3e9860351b3a31776e572d0c7424605dbd
+hmac: b6dfa4fb7dc17491ee54c9af48bf0298ce8cb6fe4fe19955aa0f03614c56cae7
 
 ...
