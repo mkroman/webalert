@@ -1,9 +1,12 @@
 use std::convert::Infallible;
 
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use warp::http::StatusCode;
-use warp::{reject, reject::Reject, Rejection, Reply};
+use warp::{
+    reject::{self, Reject},
+    Rejection, Reply,
+};
 
 pub type Token = String;
 
@@ -27,6 +30,12 @@ pub struct Alert {
     updated_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct AlertCreateRequest {
+    url: String,
+    selector: String,
+}
+
 #[derive(Debug, Serialize)]
 struct AlertListResponse {
     status: String,
@@ -39,7 +48,7 @@ mod handlers {
     use crate::database::DbPool;
     use sqlx::prelude::*;
 
-    /// Returns a JSON-serialized `AlertListResponse` with alerts beloning to the given `token`
+    /// Returns a JSON-serialized `AlertListResponse` with alerts belonging to the given `token`
     pub async fn list_alerts(db: DbPool, token: Token) -> Result<impl Reply, Rejection> {
         validate_token(db.clone(), &token).await?;
 
@@ -62,6 +71,25 @@ mod handlers {
         Ok(warp::reply::with_status(json, StatusCode::OK))
     }
 
+    /// Creates a new alert
+    pub async fn create_alert(
+        db: DbPool,
+        request: AlertCreateRequest,
+        token: Token,
+    ) -> Result<impl Reply, Rejection> {
+        validate_token(db.clone(), &token).await?;
+
+        sqlx::query("INSERT INTO alerts (url, selector, creator_token) VALUES ($1, $2, $3)")
+            .bind(request.url)
+            .bind(request.selector)
+            .bind(token)
+            .execute(&db)
+            .await
+            .map_err(|_| reject::custom(TokenRejection))?;
+
+        Ok(warp::reply::with_status(":)", StatusCode::OK))
+    }
+
     /// Queries the database for the existance of the given `token` and returns it, unless it
     /// doesn't exist in which case a `Rejection` error is returned
     async fn validate_token(db: DbPool, token: &Token) -> Result<Token, Rejection> {
@@ -81,7 +109,7 @@ mod handlers {
 }
 
 mod filters {
-    use super::{handlers, Token};
+    use super::{handlers, AlertCreateRequest, Token};
     use crate::database::DbPool;
     use warp::Filter;
 
@@ -89,7 +117,7 @@ mod filters {
     pub fn alerts(
         db: DbPool,
     ) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
-        alerts_list(db)
+        alerts_list(db.clone()).or(alerts_create(db))
     }
 
     // GET /…/alerts
@@ -101,6 +129,19 @@ mod filters {
             .and(with_db(db))
             .and(warp::header::<Token>("x-token"))
             .and_then(handlers::list_alerts)
+    }
+
+    // POST /alerts
+    pub fn alerts_create(
+        db: DbPool,
+    ) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
+        warp::path!("alerts")
+            .and(warp::post())
+            .and(with_db(db))
+            .and(warp::body::content_length_limit(1024 * 16))
+            .and(warp::body::json::<AlertCreateRequest>())
+            .and(warp::header::<Token>("x-token"))
+            .and_then(handlers::create_alert)
     }
 
     fn with_db(
