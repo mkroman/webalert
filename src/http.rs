@@ -20,10 +20,19 @@ pub async fn start_http_server(opts: &cli::ServerOpts, db_pool: PgPool) {
     // GET /api/v1
     let api_v1 = api.and(warp::path("v1"));
 
+    // GET /api/v1/_internal/…
+    let internal = api_v1.and(warp::path("_internal"));
+
+    // GET /api/v1/_internal/runners
+    let runners = internal.and(api_v1::runners(db_pool.clone()));
+
     // GET /api/v1/{alerts,}
     let alerts = api_v1.and(api_v1::alerts(db_pool.clone()));
 
-    let routes = warp::any().and(alerts).recover(api_v1::handle_rejection);
+    let routes = warp::any()
+        .and(alerts)
+        .or(runners)
+        .recover(api_v1::handle_rejection);
 
     warp::serve(routes).run(addr).await;
 

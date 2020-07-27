@@ -1,6 +1,7 @@
 use std::convert::Infallible;
 
 use chrono::{DateTime, Utc};
+use log::debug;
 use serde::{Deserialize, Serialize};
 use warp::http::StatusCode;
 use warp::{
@@ -31,16 +32,52 @@ pub struct Alert {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct AlertCreateRequest {
+pub struct CreateAlertRequest {
     url: String,
     selector: String,
 }
 
 #[derive(Debug, Serialize)]
-struct AlertListResponse {
+pub struct CreateAlertResponse {
+    id: u64,
+    status: String,
+}
+
+#[derive(Debug, Serialize)]
+struct ListAlertsResponse {
     status: String,
     alerts: Vec<Alert>,
     num_alerts: u64,
+}
+
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct Runner {
+    id: i32,
+    name: String,
+    hostname: String,
+    arch: String,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateRunnerRequest {
+    name: String,
+    hostname: String,
+    arch: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CreateRunnerResponse {
+    id: u64,
+    status: String,
+}
+
+#[derive(Debug, Serialize)]
+struct ListRunnersResponse {
+    status: String,
+    runners: Vec<Runner>,
+    num_runners: u64,
 }
 
 mod handlers {
@@ -62,7 +99,7 @@ mod handlers {
             None => vec![],
         };
 
-        let json = warp::reply::json(&AlertListResponse {
+        let json = warp::reply::json(&ListAlertsResponse {
             status: "ok".to_owned(),
             num_alerts: alerts.len() as u64,
             alerts,
@@ -74,44 +111,125 @@ mod handlers {
     /// Creates a new alert
     pub async fn create_alert(
         db: DbPool,
-        request: AlertCreateRequest,
+        request: CreateAlertRequest,
         token: Token,
     ) -> Result<impl Reply, Rejection> {
         validate_token(db.clone(), &token).await?;
 
-        sqlx::query("INSERT INTO alerts (url, selector, creator_token) VALUES ($1, $2, $3)")
-            .bind(request.url)
-            .bind(request.selector)
-            .bind(token)
-            .execute(&db)
-            .await
-            .map_err(|_| reject::custom(TokenRejection))?;
+        let res: (i32,) = sqlx::query_as(
+            "INSERT INTO alerts (url, selector, creator_token) VALUES ($1, $2, $3) RETURNING id",
+        )
+        .bind(request.url)
+        .bind(request.selector)
+        .bind(token)
+        .fetch_one(&db)
+        .await
+        .map_err(|_| reject::not_found())?;
 
-        Ok(warp::reply::with_status(":)", StatusCode::OK))
+        let json = warp::reply::json(&CreateAlertResponse {
+            status: "ok".to_owned(),
+            id: res.0 as u64,
+        });
+
+        Ok(warp::reply::with_status(json, StatusCode::OK))
+    }
+
+    /// Returns a list of registered runners
+    pub async fn list_runners(db: DbPool, token: Token) -> Result<impl Reply, Rejection> {
+        validate_token(db.clone(), &token).await?;
+
+        let runners = sqlx::query_as("SELECT * FROM runners").fetch_all(&db).await;
+
+        let runners = match runners.ok() {
+            Some(runners) => runners,
+            None => vec![],
+        };
+
+        let json = warp::reply::json(&ListRunnersResponse {
+            status: "ok".to_owned(),
+            num_runners: runners.len() as u64,
+            runners,
+        });
+
+        Ok(warp::reply::with_status(json, StatusCode::OK))
+    }
+
+    /// Creates a new runner
+    pub async fn create_runner(
+        db: DbPool,
+        token: Token,
+        request: CreateRunnerRequest,
+    ) -> Result<impl Reply, Rejection> {
+        validate_token(db.clone(), &token).await?;
+
+        let res: (i32,) = sqlx::query_as(
+            "INSERT INTO runners (name, hostname, arch) VALUES ($1, $2, $3) RETURNING id",
+        )
+        .bind(request.name)
+        .bind(request.hostname)
+        .bind(request.arch)
+        .fetch_one(&db)
+        .await
+        .map_err(|_| reject::custom(TokenRejection))?;
+
+        let json = warp::reply::json(&CreateRunnerResponse {
+            status: "ok".to_owned(),
+            id: res.0 as u64,
+        });
+
+        Ok(warp::reply::with_status(json, StatusCode::OK))
     }
 
     /// Queries the database for the existance of the given `token` and returns it, unless it
     /// doesn't exist in which case a `Rejection` error is returned
     async fn validate_token(db: DbPool, token: &Token) -> Result<Token, Rejection> {
-        let result: Option<String> =
-            sqlx::query_as("SELECT token FROM tokens WHERE token = $1::TEXT")
-                .bind(token)
-                .fetch_optional(&db)
-                .await
-                .map_err(|_| reject::custom(TokenRejection))?
-                .map(|row: (String,)| row.0);
+        let row = sqlx::query_as("SELECT token FROM tokens WHERE token = $1::TEXT")
+            .bind(token)
+            .fetch_optional(&db)
+            .await
+            .map_err(|_| reject::custom(TokenRejection))?;
 
-        match result {
-            Some(token) => Ok(token),
-            None => Err(reject::custom(TokenRejection)),
-        }
+        let token: (String,) = row.ok_or_else(|| reject::custom(TokenRejection))?;
+
+        Ok(token.0)
     }
 }
 
 mod filters {
-    use super::{handlers, AlertCreateRequest, Token};
+    use super::{handlers, CreateAlertRequest, CreateRunnerRequest, Token};
     use crate::database::DbPool;
     use warp::Filter;
+
+    // GET /…/_internal/runners
+    pub fn runners(
+        db: DbPool,
+    ) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
+        runners_list(db.clone()).or(runners_create(db))
+    }
+
+    // GET /…/runners
+    pub fn runners_list(
+        db: DbPool,
+    ) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
+        warp::path!("runners")
+            .and(warp::get())
+            .and(with_db(db))
+            .and(warp::header::<Token>("x-token"))
+            .and_then(handlers::list_runners)
+    }
+
+    // POST /…/runners
+    pub fn runners_create(
+        db: DbPool,
+    ) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
+        warp::path!("runners")
+            .and(warp::post())
+            .and(with_db(db.clone()))
+            .and(warp::body::content_length_limit(1024 * 16))
+            .and(warp::header::<Token>("x-token"))
+            .and(warp::body::json::<CreateRunnerRequest>())
+            .and_then(handlers::create_runner)
+    }
 
     // GET /alerts/… with an `X-TOKEN` header
     pub fn alerts(
@@ -139,7 +257,7 @@ mod filters {
             .and(warp::post())
             .and(with_db(db))
             .and(warp::body::content_length_limit(1024 * 16))
-            .and(warp::body::json::<AlertCreateRequest>())
+            .and(warp::body::json::<CreateAlertRequest>())
             .and(warp::header::<Token>("x-token"))
             .and_then(handlers::create_alert)
     }
@@ -152,13 +270,24 @@ mod filters {
 }
 
 pub async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
+    use warp::filters::body::BodyDeserializeError;
+    use warp::reject::*;
+
     let code;
     let message;
+
+    debug!("Returning error: {:?}", err);
 
     if err.is_not_found() {
         code = StatusCode::NOT_FOUND;
         message = "NOT_FOUND";
-    } else if err.find::<warp::reject::MethodNotAllowed>().is_some() {
+    } else if err.find::<BodyDeserializeError>().is_some() {
+        code = StatusCode::UNPROCESSABLE_ENTITY;
+        message = "INVALID_BODY";
+    } else if err.find::<UnsupportedMediaType>().is_some() {
+        code = StatusCode::UNSUPPORTED_MEDIA_TYPE;
+        message = "INVALID_CONTENT_TYPE";
+    } else if err.find::<MethodNotAllowed>().is_some() {
         code = StatusCode::METHOD_NOT_ALLOWED;
         message = "METHOD_NOT_ALLOWED";
     } else if let Some(TokenRejection) = err.find() {
@@ -178,3 +307,4 @@ pub async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> 
 }
 
 pub use filters::alerts;
+pub use filters::runners;
