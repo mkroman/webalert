@@ -224,7 +224,7 @@ mod filters {
     ) -> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone {
         warp::path!("runners")
             .and(warp::post())
-            .and(with_db(db.clone()))
+            .and(with_db(db))
             .and(warp::body::content_length_limit(1024 * 16))
             .and(warp::header::<Token>("x-token"))
             .and(warp::body::json::<CreateRunnerRequest>())

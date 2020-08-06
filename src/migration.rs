@@ -1,9 +1,17 @@
-use std::collections::BTreeMap;
+use std::future::Future;
+use std::pin::Pin;
 
-use crate::migrations;
+use crate::database::Transaction;
+use crate::migrations::{self, MigrationMap};
 
 use log::debug;
 use sqlx::PgPool;
+
+/// A pinned and boxed future that yields a `sqlx::Result`
+pub type MigrationFuture = Pin<Box<dyn Future<Output = sqlx::Result<Transaction>>>>;
+
+/// A function pointer type that takes a `Transaction` and returns a `MigrationFuture`
+pub type MigrationFn = fn(crate::database::Transaction) -> MigrationFuture;
 
 /// A migration interface that makes it easier to do transactional migrations to specific versions
 pub struct MigrationRunner<'a> {
@@ -11,9 +19,9 @@ pub struct MigrationRunner<'a> {
     /// The current migration version
     current_version: Option<String>,
     /// Initialized binary tree that holds all our migrations
-    migrations_up: BTreeMap<&'a str, &'a str>,
+    migrations_up: MigrationMap<'a>,
     /// Initialized binary tree that holds all our migrations
-    migrations_down: BTreeMap<&'a str, &'a str>,
+    migrations_down: MigrationMap<'a>,
 }
 
 impl<'a> MigrationRunner<'a> {
@@ -44,7 +52,7 @@ impl<'a> MigrationRunner<'a> {
         };
 
         // Create a list of migrations to apply
-        let migrations: Vec<(&&str, &&str)> = match &self.current_version {
+        let migrations: Vec<(&&str, &MigrationFn)> = match &self.current_version {
             Some(current_ver) => self
                 .migrations_up
                 .iter()
@@ -58,11 +66,14 @@ impl<'a> MigrationRunner<'a> {
         };
 
         if !migrations.is_empty() {
-            for (name, &migration) in migrations {
-                let mut tx = self.pool.begin().await?;
+            for (name, &up_fn) in migrations {
+                // Create a new transaction
+                let tx = self.pool.begin().await?;
                 debug!("Applying migration {}", name);
 
-                sqlx::query(migration).execute(&mut tx).await?;
+                // Run the migration and store the returned transaction
+                let mut tx = up_fn(tx).await?;
+
                 sqlx::query("INSERT INTO schema_migrations (filename) VALUES ($1::TEXT)")
                     .bind(name)
                     .execute(&mut tx)
@@ -80,7 +91,7 @@ impl<'a> MigrationRunner<'a> {
         &mut self,
         version: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let migrations: Vec<(&&str, &&str)> = match self.current_version.as_ref() {
+        let migrations: Vec<(&&str, &MigrationFn)> = match self.current_version.as_ref() {
             Some(current_ver) => self
                 .migrations_down
                 .iter()
@@ -90,11 +101,15 @@ impl<'a> MigrationRunner<'a> {
         };
 
         if !migrations.is_empty() {
-            for (name, &migration) in migrations.iter().rev() {
-                let mut tx = self.pool.begin().await?;
+            for (name, &down_fn) in migrations.iter().rev() {
+                // Create a new transaction
+                let tx = self.pool.begin().await?;
+
                 debug!("Applying downwards migration {}", name);
 
-                sqlx::query(migration).execute(&mut tx).await?;
+                // Run the migration and store the returned transaction
+                let mut tx = down_fn(tx).await?;
+
                 sqlx::query("DELETE FROM schema_migrations WHERE (filename = $1::TEXT)")
                     .bind(name)
                     .execute(&mut tx)
@@ -106,4 +121,40 @@ impl<'a> MigrationRunner<'a> {
 
         Ok(())
     }
+}
+
+#[macro_export]
+macro_rules! up {
+    ($sql:literal) => {
+        /// The migration SQL
+        pub const SQL_MIGRATION_UP: &'static str = $sql;
+
+        /// Applies the migration
+        pub async fn up(
+            mut tx: crate::database::Transaction,
+        ) -> ::sqlx::Result<crate::database::Transaction> {
+            use sqlx::executor::Executor;
+            tx.execute(SQL_MIGRATION_UP).await?;
+
+            Ok(tx)
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! down {
+    ($sql:literal) => {
+        /// The migration SQL
+        pub const SQL_MIGRATION_DOWN: &'static str = $sql;
+
+        /// Undoes the migration
+        pub async fn down(
+            mut tx: crate::database::Transaction,
+        ) -> ::sqlx::Result<crate::database::Transaction> {
+            use sqlx::executor::Executor;
+            tx.execute(SQL_MIGRATION_DOWN).await?;
+
+            Ok(tx)
+        }
+    };
 }
