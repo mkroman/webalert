@@ -8,12 +8,6 @@ use sqlx::{
 /// The database pool type. We're using Postgres for now.
 pub type DbPool = PgPool;
 
-/// The database connection type, used to simplify the migrations
-pub type Connection = sqlx::pool::PoolConnection<sqlx::PgConnection>;
-
-/// A database transaction type, used to simplify imports in the migrations
-pub type Transaction<'c> = sqlx::Transaction<'c, Connection>;
-
 /// Connects to the database specified in the CLI `opts` and ten returns the Postgres client
 /// instance
 pub async fn init(opts: &cli::Opts) -> Result<PgPool, Box<dyn std::error::Error>> {

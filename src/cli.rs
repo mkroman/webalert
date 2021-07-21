@@ -1,4 +1,4 @@
-use std::net::IpAddr;
+use std::net::SocketAddr;
 
 use structopt::StructOpt;
 
@@ -17,22 +17,27 @@ pub struct Opts {
     /// PostgreSQL host
     #[structopt(
         long,
-        env = "POSTGRES_URL",
-        value_name = "HOSTNAME",
-        default_value = "postgresql://webalert:webalert@localhost/webalert_development"
+        env = "DATABASE_URL",
+        default_value = "postgresql://webalert@localhost/webalert_development"
     )]
     pub postgres_url: String,
 }
 
 #[derive(StructOpt, Debug, Clone)]
 pub struct ServerOpts {
-    /// The number of webdrivers to run in parallel
-    #[structopt(short = "n", default_value = "3")]
-    pub num_webdrivers: u64,
     /// The local host to bind to
-    #[structopt(short = "h", default_value = "::")]
-    pub host: IpAddr,
-    /// The local port to bind to
-    #[structopt(short = "p", default_value = "3030")]
-    pub port: u16,
+    #[structopt(
+        long = "http-server-host",
+        env = "WEBALERT_HTTP_HOST",
+        default_value = "[::]:3030"
+    )]
+    pub http_host: SocketAddr,
+
+    /// GRPC host to bind to
+    #[structopt(
+        long = "grpc-server-host",
+        env = "WEBALERT_GRPC_HOST",
+        default_value = "[::]:3031"
+    )]
+    pub grpc_host: SocketAddr,
 }

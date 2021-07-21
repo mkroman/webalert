@@ -1,7 +1,6 @@
 use std::env;
 
-use webalert::http;
-use webalert::{cli, database};
+use webalert::{cli, database, grpc, http};
 
 use structopt::StructOpt;
 use tokio::runtime::Runtime;
@@ -16,9 +15,10 @@ async fn async_main(opts: cli::Opts) -> Result<(), Box<dyn std::error::Error>> {
         cli::Command::Server(ref server_opts) => {
             debug!("Starting server");
 
-            let http_server = http::start_http_server(server_opts, pool);
+            let http_server = http::start_http_server(server_opts, pool.clone());
+            let grpc_server = grpc::start_grpc_server(server_opts, pool);
 
-            tokio::join!(http_server);
+            tokio::join!(http_server, grpc_server);
         }
     }
 
@@ -28,7 +28,7 @@ async fn async_main(opts: cli::Opts) -> Result<(), Box<dyn std::error::Error>> {
 fn main() {
     // Override RUST_LOG with a default setting if it's not set by the user
     if env::var("RUST_LOG").is_err() {
-        env::set_var("RUST_LOG", "webalert=trace");
+        env::set_var("RUST_LOG", "webalert=trace,tower_http=trace");
     }
 
     tracing_subscriber::fmt()

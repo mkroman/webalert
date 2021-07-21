@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package webalert.runners.v1;
+
+import "google/protobuf/empty.proto";
+
+// The service that manages active runners (webworkers)
+service Runners {
+  // Updates the information of the current (authenticated) runner.
+  rpc Announce(AnnounceRequest) returns (google.protobuf.Empty);
+}
+
+message AnnounceRequest {
+  // The hostname of the runner
+  string hostname = 1;
+
+  // The operating system of the runner
+  string os = 2;
+
+  // The system architecture of the runner
+  string arch = 3;
+}

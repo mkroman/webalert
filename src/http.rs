@@ -1,18 +1,16 @@
-use std::net::SocketAddr;
-
 use crate::cli;
 
 use sqlx::PgPool;
-use tracing::{debug, error};
+use tracing::{debug, error, instrument};
 use warp::Filter;
 
 mod api_v1;
 
+#[instrument(skip(opts, db_pool), fields(host = %opts.http_host))]
 pub async fn start_http_server(opts: &cli::ServerOpts, db_pool: PgPool) {
-    debug!("Starting HTTP server");
+    let addr = opts.http_host;
 
-    let addr: SocketAddr = (opts.host, opts.port).into();
-    debug!(?addr, "Binding to address");
+    debug!("Starting HTTP server");
 
     // GET /api/…
     let api = warp::path("api");
