@@ -65,6 +65,7 @@ jobs:
           override: true
 
       - uses: actions/cache@v2
+        id: cli-cache
         with:
           path: |
             ~/.cargo/bin/
@@ -72,6 +73,7 @@ jobs:
 
       - name: Install the SQLx CLI
         uses: actions-rs/cargo@v1
+        if: steps.cli-cache.outputs.cache-hit != 'true'
         with:
           command: install
           args: --no-default-features --features postgres sqlx-cli
