@@ -83,7 +83,6 @@ struct ListRunnersResponse {
 mod handlers {
     use super::*;
     use crate::database::DbPool;
-    use sqlx::prelude::*;
 
     /// Returns a JSON-serialized `AlertListResponse` with alerts belonging to the given `token`
     pub async fn list_alerts(db: DbPool, token: Token) -> Result<impl Reply, Rejection> {
@@ -182,7 +181,7 @@ mod handlers {
 
     /// Queries the database for the existance of the given `token` and returns it, unless it
     /// doesn't exist in which case a `Rejection` error is returned
-    async fn validate_token(db: DbPool, token: &Token) -> Result<Token, Rejection> {
+    async fn validate_token(db: DbPool, token: &str) -> Result<Token, Rejection> {
         let row = sqlx::query_as("SELECT token FROM tokens WHERE token = $1::TEXT")
             .bind(token)
             .fetch_optional(&db)
