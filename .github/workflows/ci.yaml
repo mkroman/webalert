@@ -34,5 +34,55 @@ jobs:
           command: test
 
       - uses: actions-rs/clippy-check@v1
+        if: ${{ github.token }}
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ github.token }}
+          args: --all-features
+
+  migration-test:
+    name: Run migration tests
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://webalert@localhost/webalert_development
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_DB: webalert_development
+          POSTGRES_USER: webalert
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Install Rust stable
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - uses: actions/cache@v2
+        id: cli-cache
+        with:
+          path: |
+            ~/.cargo/bin/
+          key: ${{ runner.os }}-cargo-cli-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install the SQLx CLI
+        uses: actions-rs/cargo@v1
+        if: steps.cli-cache.outputs.cache-hit != 'true'
+        with:
+          command: install
+          args: --no-default-features --features postgres sqlx-cli
+
+      - name: Migration info
+        run: sqlx migrate info
+
+      - name: Run migration
+        run: sqlx migrate run
+
+      - name: Revert the latest migration
+        run: sqlx migrate revert 
