@@ -1,9 +1,12 @@
+use std::env;
+
 use webalert::http;
 use webalert::{cli, database};
 
-use log::{debug, error};
 use structopt::StructOpt;
 use tokio::runtime::Runtime;
+use tracing::{debug, error};
+use tracing_subscriber::EnvFilter;
 
 async fn async_main(opts: cli::Opts) -> Result<(), Box<dyn std::error::Error>> {
     // Connect to the PostgreSQL database
@@ -23,7 +26,14 @@ async fn async_main(opts: cli::Opts) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn main() {
-    env_logger::init();
+    // Override RUST_LOG with a default setting if it's not set by the user
+    if env::var("RUST_LOG").is_err() {
+        env::set_var("RUST_LOG", "webalert=trace");
+    }
+
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .init();
 
     // Set up the async runtime
     let rt = Runtime::new().expect("unable to create runtime");

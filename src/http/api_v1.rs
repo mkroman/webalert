@@ -1,8 +1,8 @@
 use std::convert::Infallible;
 
 use chrono::{DateTime, Utc};
-use log::debug;
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 use warp::http::StatusCode;
 use warp::{
     reject::{self, Reject},
@@ -268,34 +268,38 @@ mod filters {
     }
 }
 
-pub async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
+pub async fn handle_rejection(error: Rejection) -> Result<impl Reply, Infallible> {
     use warp::filters::body::BodyDeserializeError;
     use warp::reject::*;
 
     let code;
     let message;
 
-    debug!("Returning error: {:?}", err);
-
-    if err.is_not_found() {
+    if error.is_not_found() {
         code = StatusCode::NOT_FOUND;
         message = "NOT_FOUND";
-    } else if err.find::<BodyDeserializeError>().is_some() {
+    } else if error.find::<BodyDeserializeError>().is_some() {
         code = StatusCode::UNPROCESSABLE_ENTITY;
         message = "INVALID_BODY";
-    } else if err.find::<UnsupportedMediaType>().is_some() {
+    } else if error.find::<UnsupportedMediaType>().is_some() {
         code = StatusCode::UNSUPPORTED_MEDIA_TYPE;
         message = "INVALID_CONTENT_TYPE";
-    } else if err.find::<MethodNotAllowed>().is_some() {
+    } else if error.find::<MethodNotAllowed>().is_some() {
         code = StatusCode::METHOD_NOT_ALLOWED;
         message = "METHOD_NOT_ALLOWED";
-    } else if let Some(TokenRejection) = err.find() {
+    } else if let Some(TokenRejection) = error.find() {
         code = StatusCode::FORBIDDEN;
         message = "INVALID_TOKEN";
     } else {
         code = StatusCode::INTERNAL_SERVER_ERROR;
         message = "INTERNAL_SERVER_ERROR";
     }
+
+    warn!(
+        ?error,
+        response.code = ?code,
+        response.message = message,
+        "http error");
 
     let json = warp::reply::json(&ErrorMessage {
         code: code.as_u16(),
