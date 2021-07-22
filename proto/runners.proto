@@ -5,7 +5,7 @@ package webalert.runners.v1;
 import "google/protobuf/empty.proto";
 
 // The service that manages active runners (webworkers)
-service Runners {
+service Runner {
   // Updates the information of the current (authenticated) runner.
   rpc Announce(AnnounceRequest) returns (google.protobuf.Empty);
 }

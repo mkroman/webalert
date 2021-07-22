@@ -1,7 +1,7 @@
 use tonic::{Request, Response, Status};
 use tracing::{instrument, trace};
 
-use runners::runners_server::{Runners, RunnersServer};
+use runners::runner_server::{Runner, RunnerServer};
 use runners::AnnounceRequest;
 
 pub mod runners {
@@ -12,14 +12,16 @@ pub mod runners {
 }
 
 #[derive(Default)]
-pub struct RunnersService;
+pub struct RunnerService;
 
 #[tonic::async_trait]
-impl Runners for RunnersService {
-    #[instrument(skip(request, self))]
+impl Runner for RunnerService {
+    #[instrument(skip(request, self), fields(req.remote_addr = ?request.remote_addr()))]
     async fn announce(&self, request: Request<AnnounceRequest>) -> Result<Response<()>, Status> {
         let announce_req = request.into_inner();
-        trace!(%announce_req.os,
+
+        trace!(
+            %announce_req.os,
             %announce_req.hostname,
             %announce_req.arch,
             "Received runner announcement");
@@ -34,8 +36,8 @@ pub fn file_descriptor_sets<'a>() -> Vec<&'a [u8]> {
 }
 
 /// Creates and returns the gRPC `Runners` service.
-pub fn create_runners_service() -> RunnersServer<RunnersService> {
-    let runners = RunnersService::default();
+pub fn create_runners_service() -> RunnerServer<RunnerService> {
+    let runner_svc = RunnerService::default();
 
-    RunnersServer::new(runners)
+    RunnerServer::new(runner_svc)
 }
