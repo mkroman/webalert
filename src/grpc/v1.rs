@@ -16,7 +16,7 @@ pub struct RunnerService;
 
 #[tonic::async_trait]
 impl Runner for RunnerService {
-    #[instrument(skip(request, self), fields(req.remote_addr = ?request.remote_addr()))]
+    #[instrument(skip(self))]
     async fn announce(&self, request: Request<AnnounceRequest>) -> Result<Response<()>, Status> {
         let announce_req = request.into_inner();
 
@@ -31,12 +31,12 @@ impl Runner for RunnerService {
 }
 
 /// Returns a list of reflection descriptor sets for this api.
-pub fn file_descriptor_sets<'a>() -> Vec<&'a [u8]> {
+pub(crate) fn file_descriptor_sets<'a>() -> Vec<&'a [u8]> {
     vec![runners::FILE_DESCRIPTOR_SET]
 }
 
 /// Creates and returns the gRPC `Runners` service.
-pub fn create_runners_service() -> RunnerServer<RunnerService> {
+pub(crate) fn create_runners_service() -> RunnerServer<RunnerService> {
     let runner_svc = RunnerService::default();
 
     RunnerServer::new(runner_svc)

@@ -3,6 +3,10 @@ name = "webalert"
 version = "0.1.0"
 authors = ["Mikkel Kroman <mk@maero.dk>"]
 edition = "2018"
+description = "Monitor websites and receive notifications when they change"
+license = "MIT OR Apache-2.0"
+keywords = ["web", "notification"]
+repository = "https://github.com/mkroman/webalert"
 
 [lib]
 
@@ -23,10 +27,12 @@ tonic = "0.5"
 tonic-reflection = "0.2"
 tokio = { version = "1", features = ["full"] }
 tower = { version = "0.4", features = ["full"] }
-tower-http = { version = "0.1", features = ["trace"] }
+tower-http = { version = "0.1", features = ["trace", "sensitive-headers"] }
 tracing = "0.1"
 tracing-subscriber = "0.2"
+http = "0.2"
 warp = "0.3"
+futures = "0.3"
 
 [build-dependencies]
 tonic-build = "0.5"
