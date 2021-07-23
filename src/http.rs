@@ -7,7 +7,7 @@ use warp::Filter;
 mod api_v1;
 
 #[instrument(skip(opts, db_pool), fields(host = %opts.http_host))]
-pub async fn start_http_server(opts: &cli::ServerOpts, db_pool: PgPool) {
+pub async fn start_server(opts: &cli::ServerOpts, db_pool: PgPool) {
     let addr = opts.http_host;
 
     debug!("Starting HTTP server");

@@ -5,18 +5,18 @@ use runners::runner_server::{Runner, RunnerServer};
 use runners::AnnounceRequest;
 
 pub mod runners {
-    tonic::include_proto!("webalert.runners.v1");
+    tonic::include_proto!("webalert.runner.v1");
 
     pub const FILE_DESCRIPTOR_SET: &[u8] =
         tonic::include_file_descriptor_set!("runners_descriptor");
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct RunnerService;
 
 #[tonic::async_trait]
 impl Runner for RunnerService {
-    #[instrument(skip(self))]
+    #[instrument]
     async fn announce(&self, request: Request<AnnounceRequest>) -> Result<Response<()>, Status> {
         let announce_req = request.into_inner();
 

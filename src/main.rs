@@ -8,17 +8,20 @@ use tracing::{debug, error};
 use tracing_subscriber::EnvFilter;
 
 async fn async_main(opts: cli::Opts) -> Result<(), Box<dyn std::error::Error>> {
-    // Connect to the PostgreSQL database
-    let pool = database::init(&opts).await?;
-
     match &opts.command {
         cli::Command::Server(ref server_opts) => {
-            debug!("Starting server");
+            // Connect to the PostgreSQL database
+            debug!("Connecting to the database");
+            let pool = database::connect(server_opts.postgres_url.as_str()).await?;
 
-            let http_server = http::start_http_server(server_opts, pool.clone());
-            let grpc_server = grpc::start_grpc_server(server_opts, pool);
+            debug!("Starting servers");
+            let http_server = http::start_server(server_opts, pool.clone());
+            let grpc_server = grpc::start_server(server_opts, pool.clone());
 
             tokio::join!(http_server, grpc_server);
+        }
+        cli::Command::Runner(ref _runner_opts) => {
+            unimplemented!()
         }
     }
 
@@ -40,11 +43,7 @@ fn main() {
     // Parse the command-line arguments
     let opts = cli::Opts::from_args();
 
-    match &opts.command {
-        cli::Command::Server(_) => {
-            if let Err(err) = rt.block_on(async_main(opts)) {
-                error!("runtime error: {}", err);
-            }
-        }
+    if let Err(err) = rt.block_on(async_main(opts)) {
+        error!("runtime error: {}", err);
     }
 }

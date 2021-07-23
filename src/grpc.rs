@@ -60,9 +60,13 @@ where
                 response
             } else {
                 warn!("Refusing request because it doesn't have an authorization header");
-                let mut response = Response::new(tonic::body::empty_body());
-                *response.status_mut() = StatusCode::UNAUTHORIZED;
-                response
+
+                //let mut response = Response::new(tonic::body::empty_body());
+                Response::builder()
+                    .header(header::CONTENT_TYPE, "application/grpc")
+                    .status(StatusCode::UNAUTHORIZED)
+                    .body(tonic::body::empty_body())
+                    .unwrap()
             };
 
             Ok(response)
@@ -71,7 +75,7 @@ where
 }
 
 #[instrument(skip(opts, db_pool), fields(host = %opts.grpc_host))]
-pub async fn start_grpc_server(opts: &cli::ServerOpts, db_pool: DbPool) {
+pub async fn start_server(opts: &cli::ServerOpts, db_pool: DbPool) {
     debug!("Starting gRPC server");
 
     // Build the bearer token authorization layer

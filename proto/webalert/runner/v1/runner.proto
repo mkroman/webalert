@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package webalert.runners.v1;
+package webalert.runner.v1;
 
 import "google/protobuf/empty.proto";
 

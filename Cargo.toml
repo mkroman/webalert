@@ -7,6 +7,7 @@ description = "Monitor websites and receive notifications when they change"
 license = "MIT OR Apache-2.0"
 keywords = ["web", "notification"]
 repository = "https://github.com/mkroman/webalert"
+resolver = "2"
 
 [lib]
 
@@ -19,6 +20,7 @@ path = "src/main.rs"
 chrono = { version = "0.4", features = ["serde"] }
 clap = "2.33"
 prost = "0.8"
+prost-types = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sqlx = { version = "0.5", default-features = false, features = [ "macros", "postgres", "chrono", "runtime-tokio-native-tls" ] }
