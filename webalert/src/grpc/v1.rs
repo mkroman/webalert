@@ -2,7 +2,7 @@ use tonic::{Request, Response, Status};
 use tracing::{instrument, trace};
 
 use runners::runner_server::{Runner, RunnerServer};
-use runners::AnnounceRequest;
+use runners::{AnnounceRequest, ListRequest, ListResponse};
 
 pub mod runners {
     tonic::include_proto!("webalert.runner.v1");
@@ -18,15 +18,20 @@ pub struct RunnerService;
 impl Runner for RunnerService {
     #[instrument]
     async fn announce(&self, request: Request<AnnounceRequest>) -> Result<Response<()>, Status> {
-        let announce_req = request.into_inner();
+        let _announce_req = request.into_inner();
 
-        trace!(
-            %announce_req.os,
-            %announce_req.hostname,
-            %announce_req.arch,
-            "Received runner announcement");
+        trace!("Received runner announcement");
 
         Ok(Response::new(()))
+    }
+
+    #[instrument]
+    async fn list(&self, request: Request<ListRequest>) -> Result<Response<ListResponse>, Status> {
+        let _list_req = request.into_inner();
+
+        trace!("Received runner list request");
+
+        Err(Status::unimplemented("This method is not implemented yet"))
     }
 }
 

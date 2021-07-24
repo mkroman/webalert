@@ -16,7 +16,7 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
-          components: clippy
+          components: rustfmt, clippy
 
       - uses: actions/cache@v2
         with:
@@ -79,10 +79,13 @@ jobs:
           args: --no-default-features --features postgres sqlx-cli
 
       - name: Migration info
+        working-directory: ./webalert
         run: sqlx migrate info
 
       - name: Run migration
+        working-directory: ./webalert
         run: sqlx migrate run
 
       - name: Revert the latest migration
+        working-directory: ./webalert
         run: sqlx migrate revert 
