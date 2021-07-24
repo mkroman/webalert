@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use http::HeaderValue;
-use tonic::transport::Channel;
+use tonic::{transport::Channel, Status};
 use url::Url;
 
 use crate::grpc::{runner::AnnounceRequest, AuthService, RunnerClient};
@@ -42,7 +42,7 @@ impl Runner {
     /// Announces to the gRPC server that this runner is alive and running.
     ///
     /// See also [`RunnerClient::announce`]
-    pub async fn announce(&mut self) {
+    pub async fn announce(&mut self) -> Result<(), Status> {
         use std::env::consts;
 
         self.client
@@ -54,6 +54,8 @@ impl Runner {
                     .into_string()
                     .unwrap(),
             })
-            .await;
+            .await?;
+
+        Ok(())
     }
 }
