@@ -1,3 +1,14 @@
 [workspace]
 members = ["webalert", "webalert-runner"]
 resolver = "2"
+
+# Build the backtrace package with a higher optimization level in debug builds
+# to mitigate performance cost in `color_eyre`.
+#
+# See why here: https://docs.rs/color-eyre/0.5.11/color_eyre/#improving-perf-on-debug-builds
+[profile.dev.package.backtrace]
+opt-level = 3
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
