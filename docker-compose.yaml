@@ -1,0 +1,16 @@
+version: "3"
+
+services:
+  database:
+    image: "postgres"
+    ports:
+      - "5432:5432"
+    restart: always
+    environment:
+      - POSTGRES_USER=webalert
+      - POSTGRES_DB=webalert_development
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    volumes:
+      - database_data:/var/lib/postgresql/data
+volumes:
+  database_data:
