@@ -4,14 +4,13 @@ use std::task::{Context, Poll};
 use crate::cli;
 use crate::database::DbPool;
 
-use http::{header, StatusCode};
+use http::{header, Request, Response, StatusCode};
 use tonic::body::BoxBody;
 use tonic::transport::{Body, Server};
 use tower::{Layer, Service};
 use tower_http::sensitive_headers::SetSensitiveRequestHeadersLayer;
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};
 use tracing::{debug, instrument, warn};
-use warp::http::{Request, Response};
 
 pub mod v1;
 
@@ -33,9 +32,9 @@ struct RequireBearerAuthorization<S> {
     inner: S,
 }
 
-impl<S> Service<Request<Body>> for RequireBearerAuthorization<S>
+impl<S> Service<hyper::Request<Body>> for RequireBearerAuthorization<S>
 where
-    S: Service<Request<Body>, Response = Response<BoxBody>> + Clone + Send + 'static,
+    S: Service<hyper::Request<Body>, Response = hyper::Response<BoxBody>> + Clone + Send + 'static,
     S::Future: Send + 'static,
 {
     type Response = S::Response;

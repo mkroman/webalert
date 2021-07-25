@@ -1,6 +1,6 @@
 use std::env;
 
-use webalert::{cli, database, grpc, http};
+use webalert::{cli, database, grpc};
 
 use structopt::StructOpt;
 use tokio::runtime::Runtime;
@@ -14,11 +14,10 @@ async fn async_main(opts: cli::Opts) -> Result<(), Box<dyn std::error::Error>> {
             debug!("Connecting to the database");
             let pool = database::connect(server_opts.database_url.as_str()).await?;
 
-            debug!("Starting servers");
-            let http_server = http::start_server(server_opts, pool.clone());
+            debug!("Starting server");
             let grpc_server = grpc::start_server(server_opts, pool.clone());
 
-            tokio::join!(http_server, grpc_server);
+            tokio::join!(grpc_server);
         }
     }
 
