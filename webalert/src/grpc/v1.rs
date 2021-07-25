@@ -2,7 +2,7 @@ use tonic::{Request, Response, Status};
 use tracing::{instrument, trace};
 
 use runners::runner_server::{Runner, RunnerServer};
-use runners::{AnnounceRequest, ListRequest, ListResponse};
+use runners::{AnnounceRequest, ListRequest, ListResponse, PollResponse};
 
 pub mod runners {
     tonic::include_proto!("webalert.runner.v1");
@@ -32,6 +32,11 @@ impl Runner for RunnerService {
         trace!("Received runner list request");
 
         Err(Status::unimplemented("This method is not implemented yet"))
+    }
+
+    #[instrument]
+    async fn poll(&self, _request: Request<()>) -> Result<Response<PollResponse>, Status> {
+        Err(Status::not_found("no tasks"))
     }
 }
 

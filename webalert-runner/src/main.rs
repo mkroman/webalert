@@ -13,23 +13,31 @@ use tracing_subscriber::{layer::SubscriberExt, EnvFilter};
 mod cli;
 mod error;
 mod grpc;
-mod runner;
+pub mod runner;
+mod util;
 
 use error::{Error, Kind};
+use runner::Runner;
 
+#[tracing::instrument]
 async fn async_main() -> Result<(), Report> {
     let opts = cli::Opts::from_args();
 
     trace!(
         %opts.grpc_url,
-        %opts.webdriver_url,
         "Application started");
 
     debug!("Starting runner");
 
-    let mut runner = runner::Runner::new(opts.grpc_url, opts.grpc_token, opts.webdriver_url)?;
+    let mut runner = Runner::new(opts.grpc_url, opts.grpc_token)?;
 
-    runner.announce().await;
+    // Spawn the chromedriver process
+    runner
+        .announce()
+        .await
+        .map_err(|_| Error::from(Kind::RpcAnnounceFailed))?;
+    runner.spawn_chromedriver()?;
+    runner.poll().await?;
 
     Ok(())
 }

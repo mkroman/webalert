@@ -7,7 +7,7 @@ edition = "2018"
 thiserror = "1"
 tonic = "0.5"
 tokio = { version = "1", features = ["full"] }
-url = "2"
+caps = "0.5"
 tracing = "0.1"
 color-eyre = "0.5"
 tracing-error = "0.1"

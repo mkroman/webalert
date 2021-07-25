@@ -12,6 +12,11 @@ service Runner {
 
   // Returns a list of all the runners known to the server.
   rpc List(ListRequest) returns (ListResponse);
+
+  // Returns a new task to the runner if one is available.
+  //
+  // Note that when no task is available, this returns a status of NOT_FOUND.
+  rpc Poll(google.protobuf.Empty) returns (PollResponse);
 }
 
 // Details about a runner.
@@ -41,6 +46,12 @@ message ListResponse {
   repeated RunnerInfo runners = 1;
 }
 
+// The response to [Runner.Poll].
+message PollResponse {
+  string url = 1;
+}
+
+// An announcement request that a new runner sends when it initiates.
 message AnnounceRequest {
   // The hostname of the runner.
   string hostname = 1;
