@@ -43,7 +43,7 @@ fn spawn_chromedriver_proc() -> Result<Child, Error> {
     let mut cmd = Command::new("chromedriver");
     let cmd = unsafe {
         cmd.pre_exec(|| {
-            // Drop capabilities
+            // Drop process capabilities
             caps::clear(None, CapSet::Effective)
                 .map_err(|error| io::Error::new(io::ErrorKind::Other, error))?;
 
@@ -54,7 +54,6 @@ fn spawn_chromedriver_proc() -> Result<Child, Error> {
     let cmd = cmd.arg("--port=4444");
 
     debug!(?cmd, "Starting background process");
-
     let child = cmd
         .spawn()
         .map_err(|error| Error::from(Kind::CouldNotSpawnChromeDriver(error)))?;

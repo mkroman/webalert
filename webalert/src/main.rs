@@ -12,16 +12,13 @@ async fn async_main(opts: cli::Opts) -> Result<(), Box<dyn std::error::Error>> {
         cli::Command::Server(ref server_opts) => {
             // Connect to the PostgreSQL database
             debug!("Connecting to the database");
-            let pool = database::connect(server_opts.postgres_url.as_str()).await?;
+            let pool = database::connect(server_opts.database_url.as_str()).await?;
 
             debug!("Starting servers");
             let http_server = http::start_server(server_opts, pool.clone());
             let grpc_server = grpc::start_server(server_opts, pool.clone());
 
             tokio::join!(http_server, grpc_server);
-        }
-        cli::Command::Runner(ref _runner_opts) => {
-            unimplemented!()
         }
     }
 
