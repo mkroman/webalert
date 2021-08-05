@@ -16,7 +16,7 @@ service Runner {
   // Returns a new task to the runner if one is available.
   //
   // Note that when no task is available, this returns a status of NOT_FOUND.
-  rpc Poll(google.protobuf.Empty) returns (PollResponse);
+  rpc Poll(google.protobuf.Empty) returns (stream PollResponse);
 }
 
 // Details about a runner.

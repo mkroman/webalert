@@ -17,6 +17,7 @@ name = "webalert"
 path = "src/main.rs"
 
 [dependencies]
+async-stream = "0.3"
 chrono = { version = "0.4", features = ["serde"] }
 prost = "0.8"
 prost-types = "0.8"

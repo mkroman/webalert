@@ -1,4 +1,5 @@
 #![warn(missing_docs)]
+#![allow(clippy::match_like_matches_macro)]
 
 //! A scalable webalert runner that performs actions through a WebDriver.
 
@@ -15,6 +16,7 @@ mod error;
 mod grpc;
 pub mod runner;
 mod util;
+mod webdriver;
 
 use error::{Error, Kind};
 use runner::Runner;

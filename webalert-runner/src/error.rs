@@ -43,6 +43,9 @@ pub enum Kind {
     /// Occurs when unable to spawn a new chromedriver process
     #[error("Could not spawn a new chromedriver process")]
     CouldNotSpawnChromeDriver(#[source] io::Error),
+    /// Occurs when unable to connect to the webdriver
+    #[error("Could not connect to the WebDriver")]
+    WebDriverConnectionFailed(#[from] thirtyfour::error::WebDriverError),
     /// Occurs when trying to spawn a chromedriver and the previous child process is still alive
     #[error("chromedriver is already running")]
     ChromeDriverAlreadyRunning,
